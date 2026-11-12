@@ -29,7 +29,7 @@ jobs:
           user=${{ secrets.OCI_USER_OCID }}
           fingerprint=${{ secrets.OCI_FINGERPRINT }}
           tenancy=${{ secrets.OCI_TENANCY_OCID }}
-          region=${{ vars.OCI_REGION }}
+          region=${{ secrets.OCI_REGION }}
           key_file=~/.oci/oci_api_key.pem
           EOF
           echo "${{ secrets.OCI_SSH_PUBLIC_KEY }}" > /tmp/ssh_key.pub
@@ -38,7 +38,7 @@ jobs:
         id: check
         run: |
           EXISTING=$(oci compute instance list \
-            --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+            --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
             --lifecycle-state RUNNING \
             --query "length(data[?contains(\"display-name\", 'a1-video-worker')])" \
             --raw-output)
@@ -51,7 +51,7 @@ jobs:
           set +e
 
           IMAGE_ID=$(oci compute image list \
-            --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+            --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
             --operating-system "Canonical Ubuntu" \
             --operating-system-version "24.04" \
             --shape "VM.Standard.A1.Flex" \
@@ -64,16 +64,16 @@ jobs:
           fi
           echo "Using image: $IMAGE_ID"
 
-          IFS=',' read -ra ADS <<< "${{ vars.OCI_ADS }}"
+          IFS=',' read -ra ADS <<< "${{ secrets.OCI_ADS }}"
           for AD in "${ADS[@]}"; do
             echo "::group::Trying availability domain $AD"
             oci compute instance launch \
               --availability-domain "$AD" \
-              --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+              --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
               --shape "VM.Standard.A1.Flex" \
               --shape-config '{"ocpus": 2, "memoryInGBs": 12}' \
               --image-id "$IMAGE_ID" \
-              --subnet-id "${{ vars.OCI_SUBNET_OCID }}" \
+              --subnet-id "${{ secrets.OCI_SUBNET_OCID }}" \
               --assign-public-ip true \
               --display-name "a1-video-worker" \
               --ssh-authorized-keys-file /tmp/ssh_key.pub \
