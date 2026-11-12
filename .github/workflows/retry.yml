@@ -1,0 +1,92 @@
+name: OCI A1 Retry
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: oci-a1-retry
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install OCI CLI
+        run: pip install --quiet oci-cli
+
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+          umask 177
+          cat > ~/.oci/oci_api_key.pem <<'EOF'
+          ${{ secrets.OCI_PRIVATE_KEY }}
+          EOF
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          region=${{ vars.OCI_REGION }}
+          key_file=~/.oci/oci_api_key.pem
+          EOF
+          echo "${{ secrets.OCI_SSH_PUBLIC_KEY }}" > /tmp/ssh_key.pub
+
+      - name: Skip if instance already exists
+        id: check
+        run: |
+          EXISTING=$(oci compute instance list \
+            --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+            --lifecycle-state RUNNING \
+            --query "length(data[?contains(\"display-name\", 'a1-video-worker')])" \
+            --raw-output)
+          echo "existing=$EXISTING" >> "$GITHUB_OUTPUT"
+          echo "Already running: $EXISTING"
+
+      - name: Try to launch instance
+        if: steps.check.outputs.existing == '0'
+        run: |
+          set +e
+
+          IMAGE_ID=$(oci compute image list \
+            --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+            --operating-system "Canonical Ubuntu" \
+            --operating-system-version "24.04" \
+            --shape "VM.Standard.A1.Flex" \
+            --sort-by TIMECREATED --sort-order DESC \
+            --query "data[0].id" --raw-output)
+
+          if [ -z "$IMAGE_ID" ] || [ "$IMAGE_ID" = "null" ]; then
+            echo "Could not resolve an Ubuntu 24.04 aarch64 image id. Aborting this run."
+            exit 0
+          fi
+          echo "Using image: $IMAGE_ID"
+
+          IFS=',' read -ra ADS <<< "${{ vars.OCI_ADS }}"
+          for AD in "${ADS[@]}"; do
+            echo "::group::Trying availability domain $AD"
+            oci compute instance launch \
+              --availability-domain "$AD" \
+              --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+              --shape "VM.Standard.A1.Flex" \
+              --shape-config '{"ocpus": 2, "memoryInGBs": 12}' \
+              --image-id "$IMAGE_ID" \
+              --subnet-id "${{ vars.OCI_SUBNET_OCID }}" \
+              --assign-public-ip true \
+              --display-name "a1-video-worker" \
+              --ssh-authorized-keys-file /tmp/ssh_key.pub \
+              --wait-for-state RUNNING \
+              --max-wait-seconds 180
+            STATUS=$?
+            echo "::endgroup::"
+            if [ $STATUS -eq 0 ]; then
+              echo "SUCCESS in $AD"
+              exit 0
+            fi
+            echo "Failed in $AD (exit $STATUS), trying next AD if any..."
+          done
+
+          echo "No capacity in any availability domain this round. Will retry on next schedule."
+          exit 0
