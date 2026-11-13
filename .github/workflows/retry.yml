@@ -49,6 +49,10 @@ jobs:
           cat -A ~/.oci/config
           echo "--- region variable, not a secret, shown in full ---"
           echo "[${{ vars.OCI_REGION }}]"
+          echo "--- secret lengths (not masked, just numbers) ---"
+          echo "user ocid length: $(printf '%s' "${{ secrets.OCI_USER_OCID }}" | wc -c)  (expected 76)"
+          echo "tenancy ocid length: $(printf '%s' "${{ secrets.OCI_TENANCY_OCID }}" | wc -c)  (expected 78)"
+          echo "fingerprint length: $(printf '%s' "${{ secrets.OCI_FINGERPRINT }}" | wc -c)  (expected 47)"
 
       - name: Skip if instance already exists
         id: check
