@@ -34,6 +34,17 @@ jobs:
           EOF
           echo "${{ secrets.OCI_SSH_PUBLIC_KEY }}" > /tmp/ssh_key.pub
 
+      - name: Debug - verify key fingerprint on runner
+        run: |
+          echo -n "Fingerprint of key as written to disk on the runner: "
+          openssl rsa -pubout -outform DER -in ~/.oci/oci_api_key.pem 2>/dev/null | openssl md5 -c
+          echo "--- key file stats (should be ~27 lines for a 2048-bit key) ---"
+          wc -l ~/.oci/oci_api_key.pem
+          echo "First line (should be exactly -----BEGIN PRIVATE KEY-----):"
+          head -1 ~/.oci/oci_api_key.pem | cat -A
+          echo "Last line (should be exactly -----END PRIVATE KEY-----):"
+          tail -1 ~/.oci/oci_api_key.pem | cat -A
+
       - name: Skip if instance already exists
         id: check
         run: |
