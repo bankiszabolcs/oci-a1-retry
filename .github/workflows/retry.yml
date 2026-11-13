@@ -44,6 +44,11 @@ jobs:
           head -1 ~/.oci/oci_api_key.pem | cat -A
           echo "Last line (should be exactly -----END PRIVATE KEY-----):"
           tail -1 ~/.oci/oci_api_key.pem | cat -A
+          echo "--- config file structure (secret values auto-masked by GitHub) ---"
+          wc -l ~/.oci/config
+          cat -A ~/.oci/config
+          echo "--- region variable, not a secret, shown in full ---"
+          echo "[${{ vars.OCI_REGION }}]"
 
       - name: Skip if instance already exists
         id: check
