@@ -60,8 +60,8 @@ jobs:
           EXISTING=$(oci compute instance list \
             --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
             --lifecycle-state RUNNING \
-            --query "length(data[?contains(\"display-name\", 'a1-video-worker')])" \
-            --raw-output)
+            --query "length(data[?contains(\"display-name\", 'a1-video-worker')])")
+          echo "Raw query result: [$EXISTING]"
           echo "existing=$EXISTING" >> "$GITHUB_OUTPUT"
           echo "Already running: $EXISTING"
 
