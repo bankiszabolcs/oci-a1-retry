@@ -57,10 +57,15 @@ jobs:
       - name: Skip if instance already exists
         id: check
         run: |
+          echo "Full instance list (for debugging):"
+          oci compute instance list \
+            --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
+            --lifecycle-state RUNNING
+
           EXISTING=$(oci compute instance list \
             --compartment-id "${{ vars.OCI_COMPARTMENT_OCID }}" \
             --lifecycle-state RUNNING \
-            --query "length(data[?contains(\"display-name\", 'a1-video-worker')])")
+            --query "length(data)")
           echo "Raw query result: [$EXISTING]"
           echo "existing=$EXISTING" >> "$GITHUB_OUTPUT"
           echo "Already running: $EXISTING"
